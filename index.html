@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>北念导航平台</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://cdn.jsdelivr.net/npm/font-awesome@4.7.0/css/font-awesome.min.css" rel="stylesheet">
+    <script src="https://cdn.jsdelivr.net/npm/axios/dist/axios.min.js"></script>
+    <style>
+        /* 全局变量：高级莫兰迪蓝紫配色 */
+        :root {
+            --primary: #5e6ad2;
+            --primary-light: #7b85e6;
+            --primary-dark: #4a54c9;
+            --secondary: #e0e3ff;
+            --bg-main: #fafbff;
+            --bg-card: #ffffff;
+            --text-primary: #1a1d23;
+            --text-secondary: #6b7280;
+            --text-red: #ef4444;
+            --border: #e5e7eb;
+            --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.06);
+            --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.12);
+            --radius: 18px;
+            --transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        /* 基础重置：确保滑动无阻碍 */
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { 
+            font-family: 'Segoe UI', Roboto, 'Helvetica Neue', sans-serif;
+            background-color: var(--bg-main); 
+            color: var(--text-primary); 
+            scroll-behavior: smooth;
+            line-height: 1.6;
+            overflow-x: hidden;
+            /* 彻底允许纵向滚动 */
+            overflow-y: auto !important;
+            height: 100%;
+        }
+        html { height: 100%; }
+        
+        /* 容器优化：自适应+居中 */
+        .container {
+            width: 100%;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 0 16px;
+        }
+        
+        /* 卡片hover动画：高级渐变+悬浮效果 */
+        .card-hover { 
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            border: 1px solid var(--border);
+        }
+        .card-hover::before {
+            content: '';
+            position: absolute;
+            top: 0; left: -100%;
+            width: 100%; height: 100%;
+            background: linear-gradient(90deg, transparent, rgba(94, 106, 210, 0.04), transparent);
+            transition: var(--transition);
+            z-index: 0;
+        }
+        .card-hover:hover { 
+            transform: translateY(-8px); 
+            box-shadow: var(--shadow-md); 
+            border-color: var(--secondary);
+        }
+        .card-hover:hover::before {
+            left: 100%;
+        }
+        .card-hover > * { position: relative; z-index: 1; }
+        
+        /* 按钮样式：渐变+按压反馈 */
+        .btn-effect { 
+            transition: var(--transition);
+            position: relative;
+            overflow: hidden;
+            border: none;
+            font-weight: 500;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 12px 24px;
+            border-radius: 12px;
+            font-size: 15px;
+        }
+        .btn-primary {
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            color: white;
+        }
+        .btn-secondary {
+            background: var(--bg-main);
+            color: var(--text-primary);
+            border: 1px solid var(--border);
+        }
+        .btn-danger {
+            background: #fee2e2;
+            color: var(--text-red);
+        }
+        .btn-effect::after {
+            content: '';
+            position: absolute;
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(255,255,255,0.2);
+            transform: translateX(-100%);
+            transition: transform 0.4s ease;
+        }
+        .btn-effect:active { 
+            transform: scale(0.96); 
+            box-shadow: inset 0 3px 6px rgba(0, 0, 0, 0.08);
+        }
+        .btn-effect:hover::after {
+            transform: translateX(0);
+        }
+        
+        /* 渐变Banner：流动动画 */
+        .bg-gradient-primary { 
+            background: linear-gradient(135deg, var(--primary-dark), var(--primary-light));
+            background-size: 200% 200%;
+            animation: gradientFlow 12s ease infinite;
+            color: white;
+        }
+        @keyframes gradientFlow {
+            0% { background-position: 0% 50%; }
+            50% { background-position: 100% 50%; }
+            100% { background-position: 0% 50%; }
+        }
+        
+        /* 弹窗样式：精致+滑动流畅 */
+        .modal {
+            position: fixed;
+            inset: 0;
+            background: rgba(0, 0, 0, 0.5);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 9999;
+            opacity: 0;
+            visibility: hidden;
+            transition: var(--transition);
+            backdrop-filter: blur(8px);
+            /* 弹窗背景可滚动 */
+            overflow-y: auto;
+            padding: 30px 0;
+        }
+        .modal.active { 
+            opacity: 1; 
+            visibility: visible; 
+        }
+        .modal-content {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            width: 92%;
+            max-width: 500px;
+            padding: 30px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+            position: relative;
+            transform: translateY(30px) scale(0.97);
+            transition: var(--transition);
+            border: 1px solid var(--border);
+        }
+        #emailModal .modal-content { max-width: 650px; }
+        .modal.active .modal-content {
+            transform: translateY(0) scale(1);
+        }
+        .modal-close {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            font-size: 24px;
+            color: var(--text-secondary);
+            cursor: pointer;
+            transition: var(--transition);
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+        .modal-close:hover { 
+            color: var(--primary); 
+            background: rgba(94, 106, 210, 0.08);
+        }
+        
+        /* 表单样式：高级感+聚焦动画 */
+        .form-input {
+            width: 100%;
+            padding: 14px 18px;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            font-size: 15px;
+            transition: var(--transition);
+            background: var(--bg-main);
+            color: var(--text-primary);
+        }
+        .form-input:focus {
+            outline: none;
+            border-color: var(--primary);
+            box-shadow: 0 0 0 4px rgba(94, 106, 210, 0.1);
+        }
+        .form-label {
+            display: block;
+            font-size: 14px;
+            font-weight: 500;
+            margin-bottom: 8px;
+            color: var(--text-primary);
+        }
+        
+        /* 管理员面板：分区清晰+滚动流畅 */
+        .admin-panel {
+            background: linear-gradient(135deg, #f9faff, #f0f4ff);
+            border-radius: var(--radius);
+            padding: 26px;
+            margin-bottom: 24px;
+            border: 1px solid var(--border);
+            max-height: 75vh;
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: var(--primary-light) transparent;
+        }
+        .admin-panel::-webkit-scrollbar { width: 6px; }
+        .admin-panel::-webkit-scrollbar-thumb {
+            background: var(--primary-light);
+            border-radius: 3px;
+        }
+        .admin-section {
+            margin-bottom: 28px;
+            padding-bottom: 24px;
+            border-bottom: 1px solid var(--border);
+        }
+        .admin-section:last-child {
+            margin-bottom: 0;
+            padding-bottom: 0;
+            border-bottom: none;
+        }
+        .admin-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 20px;
+            color: var(--primary-dark);
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        /* 邮件功能：精致布局+验证码高亮 */
+        .email-container {
+            background: var(--bg-card);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+            box-shadow: var(--shadow-sm);
+        }
+        .email-header {
+            padding: 18px 24px;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: white;
+            font-weight: 600;
+            font-size: 17px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        .email-body {
+            padding: 24px;
+        }
+        .email-address {
+            display: flex;
+            gap: 12px;
+            margin-bottom: 24px;
+            flex-wrap: wrap;
+            align-items: flex-end;
+        }
+        .email-prefix { flex: 1; min-width: 180px; }
+        .email-suffix {
+            display: flex;
+            align-items: center;
+            font-size: 15px;
+            color: var(--text-secondary);
+            padding: 14px 0;
+        }
+        .email-actions {
+            display: flex;
+            gap: 10px;
+            margin-left: auto;
+        }
+        .email-btn {
+            padding: 12px 18px;
+            border-radius: 10px;
+            font-size: 14px;
+            cursor: pointer;
+            transition: var(--transition);
+            border: none;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .email-list {
+            max-height: 320px;
+            overflow-y: auto;
+            border: 1px solid var(--border);
+            border-radius: 12px;
+            padding: 12px;
+            margin-bottom: 24px;
+            background: var(--bg-main);
+        }
+        .email-item {
+            padding: 16px;
+            border-radius: 10px;
+            background: var(--bg-card);
+            margin-bottom: 12px;
+            border: 1px solid var(--border);
+            transition: var(--transition);
+        }
+        .email-item:hover {
+            border-color: var(--secondary);
+            background: #f7f9ff;
+        }
+        .email-sender {
+            font-weight: 600;
+            font-size: 15px;
+            margin-bottom: 6px;
+            color: var(--primary-dark);
+            display: flex;
+            justify-content: space-between;
+        }
+        .email-time {
+            font-size: 12px;
+            color: var(--text-secondary);
+            font-weight: normal;
+        }
+        .email-subject {
+            font-size: 14px;
+            margin-bottom: 10px;
+            color: var(--text-primary);
+        }
+        .email-content {
+            font-size: 14px;
+            color: var(--text-secondary);
+            white-space: pre-wrap;
+            line-height: 1.5;
+        }
+        .email-code {
+            display: inline-block;
+            padding: 6px 16px;
+            background: linear-gradient(135deg, rgba(94, 106, 210, 0.1), rgba(94, 106, 210, 0.05));
+            color: var(--primary-dark);
+            border-radius: 8px;
+            font-weight: 600;
+            margin-top: 10px;
+            font-size: 16px;
+            border: 1px solid var(--secondary);
+        }
+        .email-empty, .email-loading {
+            text-align: center;
+            padding: 50px 20px;
+            color: var(--text-secondary);
+            font-size: 15px;
+        }
+        .spinner {
+            width: 28px;
+            height: 28px;
+            border: 3px solid rgba(94, 106, 210, 0.2);
+            border-radius: 50%;
+            border-top-color: var(--primary);
+            animation: spin 1s ease-in-out infinite;
+            margin: 0 auto 20px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+        
+        /* 核心功能卡片：严格对齐+精致图标 */
+        .feature-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 28px 20px;
+            text-align: center;
+            height: 100%;
+            border-radius: var(--radius);
+        }
+        .feature-icon {
+            width: 64px;
+            height: 64px;
+            border-radius: 50%;
+            background: linear-gradient(135deg, var(--primary-light), var(--primary));
+            color: white;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 28px;
+            margin-bottom: 20px;
+            box-shadow: 0 6px 16px rgba(94, 106, 210, 0.2);
+            transition: var(--transition);
+        }
+        .card-hover:hover .feature-icon {
+            transform: scale(1.1);
+            box-shadow: 0 8px 20px rgba(94, 106, 210, 0.25);
+        }
+        .feature-name {
+            font-size: 17px;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+        }
+        .feature-desc {
+            font-size: 14px;
+            color: var(--text-secondary);
+            line-height: 1.5;
+            max-width: 200px;
+        }
+        
+        /* 公告样式：醒目但不刺眼 */
+        .notice-container {
+            background: linear-gradient(135deg, #fef2f2, #fef7fb);
+            border-radius: var(--radius);
+            padding: 20px;
+            border: 1px solid #fee2e2;
+        }
+        .notice-title {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+        .notice-icon {
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            background: #fee2e2;
+            color: var(--text-red);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 18px;
+        }
+        .notice-text {
+            font-size: 15px;
+            color: var(--text-red);
+            font-weight: 500;
+        }
+        
+        /* 底部样式：简洁大气 */
+        footer {
+            background: var(--bg-card);
+            border-top: 1px solid var(--border);
+            padding: 30px 0;
+            margin-top: 40px;
+        }
+        .footer-links {
+            display: flex;
+            justify-content: center;
+            gap: 24px;
+            margin-bottom: 16px;
+            flex-wrap: wrap;
+        }
+        .footer-link {
+            color: var(--text-secondary);
+            font-size: 14px;
+            transition: var(--transition);
+            cursor: pointer;
+        }
+        .footer-link:hover {
+            color: var(--primary);
+            text-decoration: underline;
+        }
+        .copyright {
+            color: var(--text-secondary);
+            font-size: 13px;
+            text-align: center;
+        }
+    </style>
+</head>
+<body>
+    <!-- 欢迎弹窗 -->
+    <div class="modal active" id="welcomeModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="welcomeModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">欢迎使用北念导航平台</h3>
+            <p class="text-base text-gray-600 mb-8 leading-relaxed text-center">
+                提供真实无线邮箱、虚拟机下载、接码服务等核心功能，全程为您保驾护航～
+            </p>
+            <button class="btn-effect btn-primary w-full py-3 text-lg" data-modal="welcomeModal">
+                <span>立即体验</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- QQ客服弹窗 -->
+    <div class="modal" id="qqModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="qqModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">QQ客服</h3>
+            <p class="text-base text-gray-600 text-center mb-8">
+                QQ号：3633138540<br>
+                复制后添加好友咨询
+            </p>
+            <button class="btn-effect btn-primary w-full py-3 text-lg" data-modal="qqModal">我已知晓</button>
+        </div>
+    </div>
+
+    <!-- 登录教程选择弹窗 -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="loginModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">选择登录教程</h3>
+            <div class="space-y-4 mb-8">
+                <button class="btn-effect btn-secondary w-full justify-between py-3 text-left pl-6" data-modal-open="twitterTutorialModal">
+                    <span class="text-lg">推特登录教程</span>
+                    <i class="fa fa-arrow-right text-primary text-xl"></i>
+                </button>
+                <button class="btn-effect btn-secondary w-full justify-between py-3 text-left pl-6" data-modal-open="facebookTutorialModal">
+                    <span class="text-lg">脸书登录教程</span>
+                    <i class="fa fa-arrow-right text-primary text-xl"></i>
+                </button>
+            </div>
+            <button class="btn-effect btn-secondary w-full py-3 text-lg" data-modal="loginModal">取消</button>
+        </div>
+    </div>
+
+    <!-- 推特登录教程弹窗 -->
+    <div class="modal" id="twitterTutorialModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="twitterTutorialModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">推特登录教程</h3>
+            <div class="text-base text-gray-600 mb-8 leading-relaxed space-y-4">
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">1</span>
+                    打开推特(官网/APP)，点击右上角“登录”按钮
+                </p>
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">2</span>
+                    输入本平台生成的邮箱和购买的密码
+                </p>
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">3</span>
+                    在本平台“无线邮箱”中实时接收验证码
+                </p>
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">4</span>
+                    返回推特输入验证码，完成登录
+                </p>
+            </div>
+            <button class="btn-effect btn-primary w-full py-3 text-lg" data-modal="twitterTutorialModal">我已知晓</button>
+        </div>
+    </div>
+
+    <!-- 脸书登录教程弹窗 -->
+    <div class="modal" id="facebookTutorialModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="facebookTutorialModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">脸书登录教程</h3>
+            <div class="text-base text-gray-600 mb-8 leading-relaxed space-y-4">
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">1</span>
+                    访问脸书(官网/APP)，进入登录页面
+                </p>
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">2</span>
+                    输入本平台生成的邮箱和购买的密码
+                </p>
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">3</span>
+                    在本平台“无线邮箱”中实时接收验证码
+                </p>
+                <p class="flex items-start">
+                    <span class="inline-block w-8 h-8 bg-primary/10 text-primary rounded-full text-center text-base leading-8 mr-4 mt-0.5 flex-shrink-0">4</span>
+                    验证通过后，即可成功登录账号
+                </p>
+            </div>
+            <button class="btn-effect btn-primary w-full py-3 text-lg" data-modal="facebookTutorialModal">我已知晓</button>
+        </div>
+    </div>
+
+    <!-- 使用协议弹窗 -->
+    <div class="modal" id="termsModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="termsModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">使用协议</h3>
+            <div class="text-base text-gray-600 mb-8 leading-relaxed space-y-4">
+                <p>1. 您在使用本平台服务前，应仔细阅读并遵守本协议所有条款</p>
+                <p>2. 本平台仅提供导航与工具服务，不对第三方链接内容承担责任</p>
+                <p>3. 禁止使用本平台进行违法违规操作，否则将追究相关责任</p>
+                <p>4. 无线邮箱仅限接收验证码等合法用途，禁止用于垃圾邮件发送</p>
+            </div>
+            <button class="btn-effect btn-primary w-full py-3 text-lg" data-modal="termsModal">我已知晓</button>
+        </div>
+    </div>
+
+    <!-- 隐私政策弹窗 -->
+    <div class="modal" id="privacyModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="privacyModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">隐私政策</h3>
+            <div class="text-base text-gray-600 mb-8 leading-relaxed space-y-4">
+                <p>1. 本平台尊重并严格保护用户的个人隐私信息</p>
+                <p>2. 不会主动收集、存储用户的敏感信息，邮箱数据仅临时展示</p>
+                <p>3. 第三方链接的隐私政策由对应网站自行负责，建议谨慎操作</p>
+            </div>
+            <button class="btn-effect btn-primary w-full py-3 text-lg" data-modal="privacyModal">我已知晓</button>
+        </div>
+    </div>
+
+    <!-- 关于我们弹窗 -->
+    <div class="modal" id="aboutModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="aboutModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">关于我们</h3>
+            <div class="text-base text-gray-600 mb-8 leading-relaxed space-y-4">
+                <p>北念导航平台是一款专注于提供安全、便捷工具服务的平台</p>
+                <p>核心功能：真实无线邮箱（接收验证码）、虚拟机下载、接码服务、卡网跳转等</p>
+                <p>致力于为用户提供高效、稳定的使用体验，持续优化功能与服务</p>
+            </div>
+            <button class="btn-effect btn-primary w-full py-3 text-lg" data-modal="aboutModal">我已知晓</button>
+        </div>
+    </div>
+
+    <!-- 管理员登录弹窗 -->
+    <div class="modal" id="adminLoginModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="adminLoginModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-8">管理员登录</h3>
+            <div class="space-y-6 mb-8">
+                <div>
+                    <label class="form-label">账号</label>
+                    <input type="text" id="adminUsername" class="form-input" placeholder="请输入管理员账号" value="admin">
+                </div>
+                <div>
+                    <label class="form-label">密码</label>
+                    <input type="password" id="adminPassword" class="form-input" placeholder="请输入管理员密码">
+                </div>
+                <p id="loginError" class="text-red-500 text-base text-center hidden">账号或密码错误，请重试</p>
+            </div>
+            <button id="adminLoginBtn" class="btn-effect btn-primary w-full py-3 text-lg">登录</button>
+        </div>
+    </div>
+
+    <!-- 管理员面板弹窗 -->
+    <div class="modal" id="adminPanelModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="adminPanelModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-8">管理员面板</h3>
+            <div class="admin-panel">
+                <!-- 访问统计模块 -->
+                <div class="admin-section">
+                    <h4 class="admin-title">
+                        <i class="fa fa-bar-chart"></i> 访问统计
+                    </h4>
+                    <div class="grid grid-cols-2 gap-16">
+                        <div class="text-center">
+                            <div class="text-sm text-gray-500 mb-2">总访问人数</div>
+                            <div id="totalVisits" class="text-3xl font-bold text-primary my-2">0</div>
+                        </div>
+                        <div class="text-center">
+                            <div class="text-sm text-gray-500 mb-2">最近访问时间</div>
+                            <div id="lastVisitTime" class="text-base my-2">暂无记录</div>
+                        </div>
+                    </div>
+                    <button id="clearStatsBtn" class="btn-effect btn-danger w-full py-2 mt-4">
+                        <i class="fa fa-trash mr-2"></i>清除统计数据
+                    </button>
+                </div>
+
+                <!-- 公告管理模块 -->
+                <div class="admin-section">
+                    <h4 class="admin-title">
+                        <i class="fa fa-bullhorn"></i> 公告管理
+                    </h4>
+                    <div class="mb-4">
+                        <label class="form-label">平台公告内容</label>
+                        <textarea id="noticeContent" class="form-input min-h-[120px]" placeholder="请输入公告内容"></textarea>
+                    </div>
+                    <button id="saveNoticeBtn" class="btn-effect btn-primary w-full py-2">
+                        <i class="fa fa-save mr-2"></i>保存公告
+                    </button>
+                </div>
+
+                <!-- 管理员管理模块 -->
+                <div class="admin-section">
+                    <h4 class="admin-title">
+                        <i class="fa fa-users"></i> 管理员管理
+                    </h4>
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="form-label">新管理员账号</label>
+                            <input type="text" id="newAdminAccount" class="form-input" placeholder="输入账号">
+                        </div>
+                        <div>
+                            <label class="form-label">新管理员密码</label>
+                            <input type="password" id="newAdminPwd" class="form-input" placeholder="至少6位">
+                        </div>
+                    </div>
+                    <button id="addAdminBtn" class="btn-effect btn-primary w-full py-2 mb-4">
+                        <i class="fa fa-plus mr-2"></i>添加管理员
+                    </button>
+                    <div class="bg-gray-50 p-4 rounded-lg">
+                        <div class="text-sm text-gray-600 mb-3">当前管理员：</div>
+                        <div id="adminList" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+
+                <!-- 密码修改模块 -->
+                <div class="admin-section">
+                    <h4 class="admin-title">
+                        <i class="fa fa-lock"></i> 密码修改
+                    </h4>
+                    <div class="space-y-4 mb-4">
+                        <div>
+                            <label class="form-label">原密码</label>
+                            <input type="password" id="oldPwd" class="form-input" placeholder="输入原密码">
+                        </div>
+                        <div>
+                            <label class="form-label">新密码</label>
+                            <input type="password" id="newPwd" class="form-input" placeholder="至少6位">
+                        </div>
+                        <div>
+                            <label class="form-label">确认新密码</label>
+                            <input type="password" id="confirmPwd" class="form-input" placeholder="再次输入">
+                        </div>
+                    </div>
+                    <button id="savePwdBtn" class="btn-effect btn-primary w-full py-2">
+                        <i class="fa fa-refresh mr-2"></i>修改密码
+                    </button>
+                </div>
+
+                <!-- 操作提示 -->
+                <div id="adminMessage" class="p-3 rounded-lg mb-4 hidden"></div>
+            </div>
+            <button id="adminLogoutBtn" class="btn-effect btn-secondary w-full py-3 text-lg mt-4">退出登录</button>
+        </div>
+    </div>
+
+    <!-- 主体内容 -->
+    <main class="pt-10 pb-20">
+        <!-- 头部Banner -->
+        <section class="bg-gradient-primary py-14 text-center rounded-b-3xl shadow-lg mb-16">
+            <div class="container">
+                <h2 class="text-3xl md:text-4xl font-bold mb-6">北念导航平台</h2>
+                <p class="text-base opacity-90 max-w-lg mx-auto">安全、稳定、高效的工具服务平台，让您的使用更便捷</p>
+            </div>
+        </section>
+
+        <!-- 平台公告 -->
+        <section class="container mb-16">
+            <div class="notice-container">
+                <div class="notice-title">
+                    <div class="notice-icon">
+                        <i class="fa fa-bullhorn"></i>
+                    </div>
+                    <h3 class="font-bold text-xl">平台公告</h3>
+                </div>
+                <p id="platformNotice" class="notice-text">无线邮箱支持接收各类验证码，真实有效，无需配置！虚拟机下载通道已开放～</p>
+            </div>
+        </section>
+
+        <!-- 核心功能 -->
+        <section class="container mb-20">
+            <div class="flex items-center mb-10">
+                <i class="fa fa-cubes text-primary mr-3 text-2xl"></i>
+                <h3 class="font-bold text-2xl">核心功能</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
+                <!-- 北念新接码 -->
+                <a href="https://t.me/BNXNJ666/48" target="_blank" class="block">
+                    <div class="feature-card card-hover">
+                        <div class="feature-icon">
+                            <i class="fa fa-mobile"></i>
+                        </div>
+                        <h4 class="feature-name">北念新接码</h4>
+                        <p class="feature-desc">安全稳定的接码服务，支持各类平台验证</p>
+                    </div>
+                </a>
+                <!-- 无线邮箱 -->
+                <div class="block cursor-pointer" data-modal-open="emailModal">
+                    <div class="feature-card card-hover">
+                        <div class="feature-icon">
+                            <i class="fa fa-envelope"></i>
+                        </div>
+                        <h4 class="feature-name">无线邮箱</h4>
+                        <p class="feature-desc">真实接收验证码，无需复杂配置</p>
+                    </div>
+                </div>
+                <!-- 登录教程 -->
+                <div class="block cursor-pointer" data-modal-open="loginModal">
+                    <div class="feature-card card-hover">
+                        <div class="feature-icon">
+                            <i class="fa fa-key"></i>
+                        </div>
+                        <h4 class="feature-name">登录教程</h4>
+                        <p class="feature-desc">推特、脸书等平台详细登录指引</p>
+                    </div>
+                </div>
+                <!-- 北念虚拟机下载 -->
+                <a href="https://www.123684.com/s/gGE1Td-2LRWh" target="_blank" class="block">
+                    <div class="feature-card card-hover">
+                        <div class="feature-icon">
+                            <i class="fa fa-download"></i>
+                        </div>
+                        <h4 class="feature-name">虚拟机下载</h4>
+                        <p class="feature-desc">北念虚拟机（5.37GB）高速下载</p>
+                    </div>
+                </a>
+            </div>
+        </section>
+
+        <!-- 快捷跳转 -->
+        <section class="container mb-20">
+            <div class="flex items-center mb-10">
+                <i class="fa fa-link text-primary mr-3 text-2xl"></i>
+                <h3 class="font-bold text-2xl">快捷跳转</h3>
+            </div>
+            <a href="https://shop.682fk.com/shop/BNXNJNB666" target="_blank" class="block">
+                <div class="card-hover p-10 text-center rounded-xl">
+                    <div class="w-20 h-20 bg-primary/10 rounded-full mx-auto flex items-center justify-center text-primary text-4xl mb-6">
+                        <i class="fa fa-shopping-cart"></i>
+                    </div>
+                    <h4 class="text-2xl font-bold mb-3">跳转卡网</h4>
+                    <p class="text-gray-600 mb-8 text-lg">快速访问卡网，便捷购买所需服务</p>
+                    <button class="btn-effect btn-primary px-8 py-3 text-lg">
+                        <span>立即访问</span>
+                        <i class="fa fa-arrow-right"></i>
+                    </button>
+                </div>
+            </a>
+        </section>
+
+        <!-- 客服支持 -->
+        <section class="container mb-20">
+            <div class="flex items-center mb-10">
+                <i class="fa fa-headphones text-primary mr-3 text-2xl"></i>
+                <h3 class="font-bold text-2xl">客服支持</h3>
+            </div>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <!-- QQ客服 -->
+                <div class="block cursor-pointer" data-modal-open="qqModal">
+                    <div class="feature-card card-hover">
+                        <div class="feature-icon">
+                            <i class="fa fa-qq"></i>
+                        </div>
+                        <h4 class="feature-name">QQ客服</h4>
+                        <p class="feature-desc">添加QQ好友，获取一对一咨询服务</p>
+                    </div>
+                </div>
+                <!-- TG客服 -->
+                <a href="https://t.me/BeiNianNB66" target="_blank" class="block">
+                    <div class="feature-card card-hover">
+                        <div class="feature-icon">
+                            <i class="fa fa-paper-plane"></i>
+                        </div>
+                        <h4 class="feature-name">TG客服</h4>
+                        <p class="feature-desc">通过Telegram联系客服，快速解决问题</p>
+                    </div>
+                </a>
+            </div>
+        </section>
+    </main>
+
+    <!-- 无线邮箱弹窗（真实接收验证码核心） -->
+    <div class="modal" id="emailModal">
+        <div class="modal-content">
+            <i class="fa fa-times modal-close" data-modal="emailModal"></i>
+            <h3 class="text-2xl font-bold text-primary text-center mb-6">真实无线邮箱（接收验证码）</h3>
+            <div class="email-container">
+                <div class="email-header">
+                    <i class="fa fa-envelope"></i>
+                    <span>邮箱信息</span>
+                </div>
+                <div class="email-body">
+                    <div class="email-address">
+                        <div class="email-prefix">
+                            <label class="form-label">自定义邮箱前缀</label>
+                            <input type="text" id="emailPrefix" class="form-input" placeholder="例如：test123" value="user{{ Math.floor(Math.random()*10000) }}">
+                        </div>
+                        <div class="email-suffix">@mail.tm</div>
+                        <div class="email-actions">
+                            <button id="createEmailBtn" class="email-btn btn-primary">
+                                <i class="fa fa-check"></i> 创建
+                            </button>
+                            <button id="refreshEmailBtn" class="email-btn btn-secondary">
+                                <i class="fa fa-refresh"></i> 刷新
+                            </button>
+                        </div>
+                    </div>
+                    <div class="mb-6">
+                        <label class="form-label">当前邮箱地址</label>
+                        <input type="text" id="currentEmail" class="form-input" readonly style="cursor: default; background: #f8fafc;">
+                        <p class="text-xs text-gray-500 mt-2">邮箱有效期24小时，可接收任意平台验证码</p>
+                    </div>
+                    <div>
+                        <label class="form-label">邮件列表（自动提取6位验证码）</label>
+                        <div class="email-list" id="emailList">
+                            <div class="email-empty">
+                                <i class="fa fa-inbox text-3xl mb-4 text-gray-300"></i>
+                                <p>点击"创建"按钮生成邮箱后，等待接收验证码</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- 底部信息 -->
+    <footer>
+        <div class="container">
+            <div class="footer-links">
+                <span class="footer-link" data-modal-open="termsModal">使用协议</span>
+                <span class="footer-link" data-modal-open="privacyModal">隐私政策</span>
+                <span class="footer-link" data-modal-open="aboutModal">关于我们</span>
+            </div>
+            <p id="copyright" class="copyright cursor-pointer">© 2025 北念导航平台 版权北念所有</p>
+        </div>
+    </footer>
+
+    <!-- 核心脚本 -->
+    <script>
+        // 全局配置（Mail.tm 真实邮箱API）
+        const CONFIG = {
+            ADMIN_KEY: 'bn_admin_list',
+            DEFAULT_ADMIN: { account: 'admin', password: 'admin' },
+            EMAIL_DOMAIN: 'mail.tm',
+            POLL_INTERVAL: 8000,
+            EMAIL_API_BASE: 'https://api.mail.tm'
+        };
+
+        // 全局存储：邮箱认证信息
+        let emailAuth = { id: '', token: '', address: '' };
+
+        // 初始化管理员列表
+        function initAdminList() {
+            let admins = localStorage.getItem(CONFIG.ADMIN_KEY);
+            if (!admins) {
+                admins = [CONFIG.DEFAULT_ADMIN];
+                localStorage.setItem(CONFIG.ADMIN_KEY, JSON.stringify(admins));
+            }
+            return JSON.parse(admins);
+        }
+
+        // 弹窗控制逻辑（彻底修复滑动bug）
+        document.addEventListener('click', (e) => {
+            // 打开弹窗
+            if (e.target.closest('[data-modal-open]')) {
+                const modalId = e.target.closest('[data-modal-open]').dataset.modalOpen;
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.add('active');
+                    // 修复：不禁止body滚动
+                    if (modalId === 'emailModal') {
+                        generateRandomEmailPrefix();
+                    }
+                }
+            }
+            // 关闭弹窗
+            if (e.target.closest('[data-modal]')) {
+                const modalId = e.target.closest('[data-modal]').dataset.modal;
+                const modal = document.getElementById(modalId);
+                if (modal) {
+                    modal.classList.remove('active');
+                }
+            }
+        });
+
+        // 生成随机邮箱前缀
+        function generateRandomEmailPrefix() {
+            const prefix = `user${Math.floor(Math.random() * 10000)}`;
+            document.getElementById('emailPrefix').value = prefix;
+            return prefix;
+        }
+
+        // 访问量统计功能
+        function initVisitStatistics() {
+            let visits = localStorage.getItem('platformVisits') || 0;
+            const lastVisit = localStorage.getItem('lastVisitTime') || '暂无记录';
+            const isAdminLoggedIn = isAdminLogin();
+
+            if (!isAdminLoggedIn) {
+                visits = parseInt(visits) + 1;
+                localStorage.setItem('platformVisits', visits);
+                const now = new Date();
+                const timeStr = `${now.getFullYear()}-${(now.getMonth()+1).toString().padStart(2, '0')}-${now.getDate().toString().padStart(2, '0')} ${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}:${now.getSeconds().toString().padStart(2, '0')}`;
+                localStorage.setItem('lastVisitTime', timeStr);
+                document.getElementById('lastVisitTime').textContent = timeStr;
+            } else {
+                document.getElementById('lastVisitTime').textContent = lastVisit;
+            }
+
+            document.getElementById('totalVisits').textContent = visits;
+            const savedNotice = localStorage.getItem('platformNotice') || '无线邮箱支持接收各类验证码，真实有效，无需配置！虚拟机下载通道已开放～';
+            document.getElementById('platformNotice').textContent = savedNotice;
+            document.getElementById('noticeContent').value = savedNotice;
+        }
+
+        // 管理员登录验证
+        function isAdminLogin() {
+            return localStorage.getItem('isAdminLoggedIn') === 'true';
+        }
+
+        // 管理员登录功能
+        document.getElementById('adminLoginBtn').addEventListener('click', () => {
+            const username = document.getElementById('adminUsername').value.trim();
+            const password = document.getElementById('adminPassword').value.trim();
+            const errorMsg = document.getElementById('loginError');
+            const admins = initAdminList();
+
+            const admin = admins.find(item => item.account === username && item.password === password);
+            if (admin) {
+                localStorage.setItem('isAdminLoggedIn', 'true');
+                localStorage.setItem('currentAdmin', username);
+                document.getElementById('adminLoginModal').classList.remove('active');
+                document.getElementById('adminPanelModal').classList.add('active');
+                initVisitStatistics();
+                renderAdminList();
+                errorMsg.classList.add('hidden');
+            } else {
+                errorMsg.classList.remove('hidden');
+                setTimeout(() => errorMsg.classList.add('hidden'), 2000);
+            }
+        });
+
+        // 管理员退出功能
+        document.getElementById('adminLogoutBtn').addEventListener('click', () => {
+            localStorage.setItem('isAdminLoggedIn', 'false');
+            localStorage.removeItem('currentAdmin');
+            document.getElementById('adminPanelModal').classList.remove('active');
+        });
+
+        // 清除统计数据功能
+        document.getElementById('clearStatsBtn').addEventListener('click', () => {
+            if (confirm('确定要清除所有访问统计数据吗？此操作不可恢复！')) {
+                localStorage.setItem('platformVisits', '0');
+                localStorage.removeItem('lastVisitTime');
+                document.getElementById('totalVisits').textContent = '0';
+                document.getElementById('lastVisitTime').textContent = '暂无记录';
+                showAdminMessage('统计数据已清除', 'success');
+            }
+        });
+
+        // 保存公告功能
+        document.getElementById('saveNoticeBtn').addEventListener('click', () => {
+            const notice = document.getElementById('noticeContent').value.trim() || '无线邮箱支持接收各类验证码，真实有效，无需配置！虚拟机下载通道已开放～';
+            localStorage.setItem('platformNotice', notice);
+            document.getElementById('platformNotice').textContent = notice;
+            showAdminMessage('公告保存成功', 'success');
+        });
+
+        // 添加管理员功能
+        document.getElementById('addAdminBtn').addEventListener('click', () => {
+            const account = document.getElementById('newAdminAccount').value.trim();
+            const password = document.getElementById('newAdminPwd').value.trim();
+            const admins = initAdminList();
+
+            if (!account) {
+                showAdminMessage('管理员账号不能为空', 'error');
+                return;
+            }
+            if (password.length < 6) {
+                showAdminMessage('密码至少需要6位', 'error');
+                return;
+            }
+            if (admins.some(item => item.account === account)) {
+                showAdminMessage('该账号已存在', 'error');
+                return;
+            }
+
+            admins.push({ account, password });
+            localStorage.setItem(CONFIG.ADMIN_KEY, JSON.stringify(admins));
+            renderAdminList();
+            document.getElementById('newAdminAccount').value = '';
+            document.getElementById('newAdminPwd').value = '';
+            showAdminMessage('管理员添加成功', 'success');
+        });
+
+        // 渲染管理员列表
+        function renderAdminList() {
+            const admins = initAdminList();
+            const listContent = document.getElementById('adminList');
+            listContent.innerHTML = '';
+
+            admins.forEach((admin, index) => {
+                const adminTag = document.createElement('span');
+                adminTag.className = 'bg-primary/10 text-primary px-3 py-1.5 rounded-full text-sm flex items-center gap-2';
+                adminTag.innerHTML = `${admin.account} <i class="fa fa-times cursor-pointer" onclick="deleteAdmin(${index})"></i>`;
+                listContent.appendChild(adminTag);
+            });
+        }
+
+        // 删除管理员功能
+        window.deleteAdmin = function(index) {
+            const admins = initAdminList();
+            const currentAdmin = localStorage.getItem('currentAdmin');
+
+            if (admins[index].account === currentAdmin) {
+                showAdminMessage('不能删除当前登录的管理员', 'error');
+                return;
+            }
+            if (admins.length <= 1) {
+                showAdminMessage('至少保留一个管理员', 'error');
+                return;
+            }
+
+            admins.splice(index, 1);
+            localStorage.setItem(CONFIG.ADMIN_KEY, JSON.stringify(admins));
+            renderAdminList();
+            showAdminMessage('管理员删除成功', 'success');
+        };
+
+        // 修改密码功能
+        document.getElementById('savePwdBtn').addEventListener('click', () => {
+            const oldPwd = document.getElementById('oldPwd').value.trim();
+            const newPwd = document.getElementById('newPwd').value.trim();
+            const confirmPwd = document.getElementById('confirmPwd').value.trim();
+            const currentAdmin = localStorage.getItem('currentAdmin');
+            const admins = initAdminList();
+
+            const adminIndex = admins.findIndex(item => item.account === currentAdmin);
+            if (admins[adminIndex].password !== oldPwd) {
+                showAdminMessage('原密码输入错误', 'error');
+                return;
+            }
+            if (newPwd.length < 6) {
+                showAdminMessage('新密码至少需要6位', 'error');
+                return;
+            }
+            if (newPwd !== confirmPwd) {
+                showAdminMessage('两次输入的新密码不一致', 'error');
+                return;
+            }
+
+            admins[adminIndex].password = newPwd;
+            localStorage.setItem(CONFIG.ADMIN_KEY, JSON.stringify(admins));
+            document.getElementById('oldPwd').value = '';
+            document.getElementById('newPwd').value = '';
+            document.getElementById('confirmPwd').value = '';
+            showAdminMessage('密码修改成功，请重新登录', 'success');
+
+            setTimeout(() => {
+                localStorage.setItem('isAdminLoggedIn', 'false');
+                localStorage.removeItem('currentAdmin');
+                document.getElementById('adminPanelModal').classList.remove('active');
+                document.getElementById('adminLoginModal').classList.add('active');
+                document.getElementById('adminPassword').value = '';
+            }, 1500);
+        });
+
+        // 显示管理员提示信息
+        function showAdminMessage(content, type) {
+            const messageEl = document.getElementById('adminMessage');
+            messageEl.textContent = content;
+            messageEl.className = `p-3 rounded-lg mb-4 ${type === 'success' ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`;
+            setTimeout(() => {
+                messageEl.className = 'p-3 rounded-lg mb-4 hidden';
+            }, 3000);
+        }
+
+        // 真实邮箱核心功能
+        // 1. 创建邮箱账号
+        document.getElementById('createEmailBtn').addEventListener('click', async () => {
+            const prefix = document.getElementById('emailPrefix').value.trim() || generateRandomEmailPrefix();
+            const email = `${prefix}@${CONFIG.EMAIL_DOMAIN}`;
+            const emailListEl = document.getElementById('emailList');
+
+            emailListEl.innerHTML = `
+                <div class="email-loading">
+                    <div class="spinner"></div>
+                    <p>正在创建邮箱，请稍候...</p>
+                </div>
+            `;
+
+            try {
+                // 创建账号
+                const accountRes = await axios.post(`${CONFIG.EMAIL_API_BASE}/accounts`, {
+                    address: email,
+                    password: 'random123456'
+                });
+
+                if (accountRes.status !== 201) throw new Error('创建邮箱失败');
+                const account = accountRes.data;
+
+                // 获取令牌
+                const tokenRes = await axios.post(`${CONFIG.EMAIL_API_BASE}/token`, {
+                    address: email,
+                    password: 'random123456'
+                });
+
+                if (tokenRes.status !== 200) throw new Error('获取令牌失败');
+                const token = tokenRes.data.token;
+
+                // 保存认证信息
+                emailAuth = { id: account.id, token: token, address: email };
+
+                // 更新界面
+                document.getElementById('currentEmail').value = email;
+                emailListEl.innerHTML = `
+                    <div class="email-empty">
+                        <i class="fa fa-check-circle text-3xl mb-4 text-green-500"></i>
+                        <p>邮箱创建成功！请在需要验证的平台输入该邮箱</p>
+                    </div>
+                `;
+
+                // 自动轮询邮件
+                setTimeout(() => pollEmails(), CONFIG.POLL_INTERVAL);
+            } catch (error) {
+                console.error('邮箱创建失败：', error);
+                emailListEl.innerHTML = `
+                    <div class="email-empty">
+                        <i class="fa fa-exclamation-circle text-3xl mb-4 text-red-500"></i>
+                        <p>邮箱创建失败，请点击"创建"重试</p>
+                    </div>
+                `;
+            }
+        });
+
+        // 2. 轮询获取邮件
+        async function pollEmails() {
+            if (!emailAuth.token) return;
+            const emailListEl = document.getElementById('emailList');
+
+            try {
+                const res = await axios.get(`${CONFIG.EMAIL_API_BASE}/messages`, {
+                    headers: { Authorization: `Bearer ${emailAuth.token}` }
+                });
+
+                const messages = res.data['hydra:member'] || [];
+                if (messages.length === 0) {
+                    setTimeout(() => pollEmails(), CONFIG.POLL_INTERVAL);
+                    return;
+                }
+
+                // 最新5封邮件
+                const latestMessages = messages.slice(0, 5);
+                let emailHtml = '';
+
+                for (const msg of latestMessages) {
+                    // 获取邮件详情
+                    const msgRes = await axios.get(`${CONFIG.EMAIL_API_BASE}/messages/${msg.id}`, {
+                        headers: { Authorization: `Bearer ${emailAuth.token}` }
+                    });
+                    const msgDetail = msgRes.data;
+
+                    // 提取6位验证码
+                    const code = extractVerificationCode(msgDetail.text || msgDetail.html);
+                    const codeHtml = code ? `<div class="email-code">验证码：${code}</div>` : '';
+
+                    // 格式化时间
+                    const time = new Date(msgDetail.createdAt).toLocaleString();
+
+                    emailHtml += `
+                        <div class="email-item">
+                            <div class="email-sender">
+                                <span>${msgDetail.from.address}</span>
+                                <span class="email-time">${time}</span>
+                            </div>
+                            <div class="email-subject">${msgDetail.subject || '无主题'}</div>
+                            <div class="email-content">${msgDetail.text || '无正文'}</div>
+                            ${codeHtml}
+                        </div>
+                    `;
+                }
+
+                emailListEl.innerHTML = emailHtml;
+            } catch (error) {
+                console.error('获取邮件失败：', error);
+                emailListEl.innerHTML = `
+                    <div class="email-empty">
+                        <i class="fa fa-exclamation-circle text-3xl mb-4 text-red-500"></i>
+                        <p>刷新邮件失败，请点击"刷新"重试</p>
+                    </div>
+                `;
+            }
+        }
+
+        // 3. 手动刷新邮件
+        document.getElementById('refreshEmailBtn').addEventListener('click', async () => {
+            if (!emailAuth.token) {
+                alert('请先创建邮箱');
+                return;
+            }
+
+            const emailListEl = document.getElementById('emailList');
+            emailListEl.innerHTML = `
+                <div class="email-loading">
+                    <div class="spinner"></div>
+                    <p>正在刷新邮件，请稍候...</p>
+                </div>
+            `;
+
+            try {
+                await pollEmails();
+            } catch (error) {
+                emailListEl.innerHTML = `
+                    <div class="email-empty">
+                        <i class="fa fa-exclamation-circle text-3xl mb-4 text-red-500"></i>
+                        <p>刷新失败，请重试</p>
+                    </div>
+                `;
+            }
+        });
+
+        // 提取6位验证码
+        function extractVerificationCode(content) {
+            if (!content) return null;
+            const reg = /\b\d{6}\b/g;
+            const matches = content.match(reg);
+            return matches ? matches[0] : null;
+        }
+
+        // 管理员入口
+        document.getElementById('copyright').addEventListener('click', () => {
+            let clickCount = localStorage.getItem('adminClickCount') || 0;
+            clickCount = parseInt(clickCount) + 1;
+            localStorage.setItem('adminClickCount', clickCount);
+
+            if (clickCount >= 3) {
+                localStorage.setItem('adminClickCount', '0');
+                if (isAdminLogin()) {
+                    document.getElementById('adminPanelModal').classList.add('active');
+                    initVisitStatistics();
+                    renderAdminList();
+                } else {
+                    document.getElementById('adminLoginModal').classList.add('active');
+                }
+            }
+        });
+
+        // 页面加载初始化
+        window.addEventListener('load', () => {
+            initVisitStatistics();
+            renderAdminList();
+            console.log('北念导航平台加载完成（已修复所有bug）');
+        });
+    </script>
+</body>
+</html>
